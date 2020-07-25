@@ -1,0 +1,7 @@
+name,mac,role,IP,OS,vcpu,ram,disk
+Router,52:54:00:44:66:00,Router,1, pfsense,1,2048,5
+DC1,52:54:00:44:66:01,DomainController,2,win2k19,2,4096,40
+SCCM1,52:54:00:44:66:02,SCCMServer,3,win2k16,2,4096,40
+SRV1,52:54:00:44:66:03,Memberserver,DHCP,win2k12r2,2,4096,40
+WKS1,52:54:00:44:66:04,Workstation,DHCP,windows10,2,4096,40
+WKS2,52:54:00:44:66:05,Workstation,DHCP,windows81,2,4096,40
