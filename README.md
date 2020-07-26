@@ -6,7 +6,7 @@ This script will download dependencies and drivers for QEMU / Spice / SSH and wi
 
 It can also begin building a Domain for rapid implementation of testing
 
-Dependencies:
+Dependencies required to be able to run this script:
   QEMU/KVM
   libvirt
   virt-manager

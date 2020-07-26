@@ -182,7 +182,7 @@ if (!(test-path $PSScriptroot/Toolkit/OpenSSH-Win64))
 if (!(test-path $PSScriptroot/ISO/pfsense.iso))
     {
         start-process -FilePath "gunzip" -ArgumentList "$psscriptroot/Toolkit/Downloads/pfSense-CE-2.4.5-RELEASE-p1-amd64.iso.gz" -Wait
-        Move-Item "$PSScriptroot/pfSense-CE-2.4.5-RELEASE-p1-amd64.iso" -Destination "$PSScriptroot/ISO/pfsense.iso"
+        Move-Item "$PSScriptroot/Toolkit/Downloads/pfSense-CE-2.4.5-RELEASE-p1-amd64.iso" -Destination "$PSScriptroot/ISO/pfsense.iso"
     }
 
 
@@ -197,7 +197,6 @@ $setupbase = @'
 start-sleep -seconds 15
 
 $OS = (Get-WmiObject win32_operatingsystem)
-
 
 #region Enable Remote Connections (Install SSH and enable RDP)
 
@@ -294,6 +293,7 @@ $MAC = (Get-WmiObject win32_networkadapter).macaddress
 switch ($MAC) 
 
 {
+
 LISTOFMACHINESINBUILDLIST
 }
 '@
@@ -817,21 +817,23 @@ if ($buildlist.OS -contains "win2k12")
 
 #region build ISO files for OS versions
 
-Copy-Item -Path "$PSScriptroot/Toolkit/Certificates" -Recurse -Destination "$PSScriptroot/ISOBuild"
-Copy-Item -Path "$PSScriptroot/Toolkit/Drivers" -Recurse -Destination "$PSScriptroot/ISOBuild"
-Copy-Item -Path "$PSScriptroot/Toolkit/OpenSSH-Win64" -Recurse -Destination "$PSScriptroot/ISOBuild"
-Copy-Item -Path "$PSScriptroot/Toolkit/QEMUGuestAgent" -Recurse -Destination "$PSScriptroot/ISOBuild"
-Copy-Item -Path "$PSScriptroot/Toolkit/Scripts" -Recurse -Destination "$PSScriptroot/ISOBuild"
-Move-Item -Path "$PSScriptroot/ISOBuild/Scripts/Setup.ps1" -Destination "$PSScriptroot/ISOBuild"
-New-Item -ItemType Directory $PSScriptroot/ISOBuild/SpiceGuestTools
-New-Item -ItemType Directory $PSScriptroot/ISOBuild/SpiceWebDAV
-Copy-Item -Path "$PSScriptroot/Toolkit/Downloads/spice-guest-tools-latest.exe" -Destination "$PSScriptroot/ISOBuild/SpiceGuestTools"
-Copy-Item -Path "$PSScriptroot/Toolkit/Downloads/spice-webdavd-x64-latest.msi" -Destination "$PSScriptroot/ISOBuild/SpiceWebDAV"
+Copy-Item -Path "$PSScriptroot/Toolkit/Certificates" -Recurse -Destination "$PSScriptroot/ISOBuild" -Force
+Copy-Item -Path "$PSScriptroot/Toolkit/Drivers" -Recurse -Destination "$PSScriptroot/ISOBuild" -Force
+Copy-Item -Path "$PSScriptroot/Toolkit/OpenSSH-Win64" -Recurse -Destination "$PSScriptroot/ISOBuild" -Force
+Copy-Item -Path "$PSScriptroot/Toolkit/QEMUGuestAgent" -Recurse -Destination "$PSScriptroot/ISOBuild" -Force
+Copy-Item -Path "$PSScriptroot/Toolkit/Scripts" -Recurse -Destination "$PSScriptroot/ISOBuild" -Force
+Move-Item -Path "$PSScriptroot/ISOBuild/Scripts/Setup.ps1" -Destination "$PSScriptroot/ISOBuild" -Force
+New-Item -ItemType Directory "$PSScriptroot/ISOBuild/SpiceGuestTools" -Force
+New-Item -ItemType Directory "$PSScriptroot/ISOBuild/SpiceGuestTools" -Force
+New-Item -ItemType Directory "$PSScriptroot/ISOBuild/SpiceWebDAV" -Force 
+Copy-Item -Path "$PSScriptroot/Toolkit/Downloads/spice-guest-tools-latest.exe" -Destination "$PSScriptroot/ISOBuild/SpiceGuestTools" -Force
+Copy-Item -Path "$PSScriptroot/Toolkit/Downloads/spice-webdavd-x64-latest.msi" -Destination "$PSScriptroot/ISOBuild/SpiceWebDAV" -Force
 
 $isostobuild = Get-ChildItem -Path "$PSScriptroot/Toolkit/AutoUnattend" -filter *.xml
 
 foreach ($isotobuild in $isostobuild)
     {
+        if (Test-Path "$PSScriptroot/ISO/$($isotobuild.basename)-setup.iso") {Remove-Item "$PSScriptroot/ISO/$($isotobuild.basename)-setup.iso" -Force}
         copy-item -Path $isotobuild.fullname -Destination "$PSScriptroot/ISOBuild/autounattend.xml" -Force
         start-process -Filepath "xorrisofs" -Argumentlist "-r -J -o $PSScriptroot/ISO/$($isotobuild.basename)-setup.iso $PSScriptroot/ISOBuild/" -Wait
     }
@@ -862,6 +864,10 @@ if ($checknetwork -notmatch $QEMUNetwork)
 
 
 #region define Virtual Machines
+foreach ($machine in $buildlist)
+    {
+        start-process "qemu-img" -ArgumentList "create -f qcow2 $psscriptroot/$($machine.name).qcow2 $($machine.disk)G" -Wait
+    }
 
 foreach ($machine in $PrimaryDC)
     {
@@ -872,13 +878,22 @@ foreach ($machine in $PrimaryDC)
                 start-sleep -Milliseconds 200 
             }
 
-            Write-Host "Waiting for 3 minutes for Primary DC to get ahead so other machines can join domain"
-            Start-Sleep -Seconds 180
+            Write-Host "Waiting for 5 minutes for Primary DC to get ahead so other machines can join domain"
+            Start-Sleep -Seconds 60
+            Write-Host "4 Minutes ...."
+            Start-Sleep -Seconds 60
+            Write-Host "3 Minutes ...."
+            Start-Sleep -Seconds 60
+            Write-Host "2 Minutes ...."
+            Start-Sleep -Seconds 60
+            Write-Host "1 Minute ...."
+            Start-Sleep -Seconds 60
+            Write-Host " Initiating Build of remaining machines"
     }
 
 
 
-foreach ($machine in ($buildlist | Where-Object $_ -ne $PrimaryDC | Where-Object $_ -ne $Router))
+foreach ($machine in ($buildlist | Where-Object {$_ -ne $PrimaryDC} | Where-Object {$_ -ne $Router}))
     {
         start-process -filepath "virt-install" -ArgumentList "--virt-type=kvm --boot machine=q35 --boot uefi --name=$($machine.name) --ram=$($machine.ram) --vcpus=$($machine.vcpu) --os-type=windows --os-variant=$($machine.os) --disk $psscriptroot/$($machine.name).qcow2,size=$($machine.disk),bus=sata,format=qcow2 --disk $psscriptroot/ISO/$($machine.os)-setup.iso,device=cdrom,bus=sata --cdrom=$psscriptroot/ISO/$($machine.os).iso --network=network=$QEMUNetwork,model=virtio,mac=$($machine.mac) --graphics=spice $VirtInstallArgs"
         for ($i=1; $i -le 30; $i++)
