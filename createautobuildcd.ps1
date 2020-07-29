@@ -587,7 +587,7 @@ if (($OS | Select-Object -expandproperty OSArchitecture) -eq "64-bit")
         New-Item -ItemType Directory -Path "$env:ProgramFiles\OpenSSH"
         copy-item -Path "c:\Setup\OpenSSH-Win64\*" -Destination "$env:ProgramFiles\OpenSSH" -Recurse -Force
     }
-elseif
+elseif (($OS | Select-Object -expandproperty OSArchitecture) -eq "32-bit")
     {
         New-Item -ItemType Directory -Path "$env:ProgramFiles\OpenSSH"
         copy-item -Path "c:\Setup\OpenSSH-Win32" -Destination "$env:ProgramFiles\OpenSSH" -Recurse -Force
